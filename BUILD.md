@@ -2,7 +2,7 @@
 
 ## Quick Build (Docker)
 
-Build for x64 Linux from Mac using Docker.
+Build for x64 Linux from Mac using Docker - handles certificate issues automatically.
 
 ### One-Command Build
 
@@ -24,10 +24,16 @@ docker run --rm -v /Users/doug/workspaces/esm2/bin:/app alpine /app/esm -h
 ## Build Details
 
 ### Problem Solved
-This repo had missing dependencies from `infini.sh/framework` that was referenced in the original Makefile but doesn't exist.
+This repo had missing dependencies from `infini.sh/framework` that was referenced in the original Makefile but doesn't exist in this repository.
+
+**Why Not Use Real infinilabs/framework?**
+- The real infinilabs framework (all versions including v1.0.0) requires Go 1.24+ due to updated dependencies
+- This codebase was written for Go 1.16 era
+- Using the real framework would require updating all dependencies and potentially breaking compatibility
+- The stub approach provides exactly what's needed without dependency conflicts
 
 ### Solution
-Created minimal stub modules WITHOUT changing any actual dependencies:
+Created minimal local stub modules that provide only the required functionality WITHOUT changing any HTTP libraries or actual dependencies:
 
 1. **framework/core/util/util.go** - Provides missing utility functions:
    - `SubString(s, start, end)` - Safe substring extraction
