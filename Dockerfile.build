@@ -1,0 +1,21 @@
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /build
+
+# Install git and ca-certificates
+RUN apk add --no-cache git ca-certificates
+
+# Copy everything
+COPY . .
+
+# Download dependencies with insecure flag to bypass cert issues
+RUN GOINSECURE=* GOPRIVATE=* go mod tidy && \
+    GOINSECURE=* GOPRIVATE=* go mod download
+
+# Build for x64 Linux
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o esm .
+
+# Final stage - just the binary
+FROM scratch
+COPY --from=builder /build/esm /esm
+ENTRYPOINT ["/esm"]
