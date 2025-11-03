@@ -106,7 +106,7 @@ func (s *ESAPIV7) NextScroll(scrollTime string, scrollId string) (interface{}, e
 	id := bytes.NewBufferString(scrollId)
 
 	url := fmt.Sprintf("%s/_search/scroll?scroll=%s&scroll_id=%s", s.Host, scrollTime, id)
-	body,err:=DoRequest(s.Compress,"GET",url,s.Auth,nil,s.HttpProxy)
+	body,err:=DoRequest(s.Compress,"GET",url,s.Auth,nil,s.HttpProxy,s.HostHeader)
 
 	if err != nil {
 		//log.Error(errs)
@@ -135,7 +135,7 @@ func (s *ESAPIV7) UpdateIndexSettings(indexName string,settings map[string]inter
 
 func (s *ESAPIV7) GetIndexMappings(copyAllIndexes bool, indexNames string) (string, int, *Indexes, error) {
 	url := fmt.Sprintf("%s/%s/_mapping", s.Host, indexNames)
-	resp, body, errs := Get(url, s.Auth,s.HttpProxy)
+	resp, body, errs := Get(url, s.Auth,s.HttpProxy,s.HostHeader)
 
 	if resp!=nil&& resp.Body!=nil{
 		io.Copy(ioutil.Discard, resp.Body)

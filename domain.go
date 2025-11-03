@@ -131,6 +131,7 @@ type Config struct {
 	InputFileType       string `long:"input_file_type"                 description:"the data type of input file, options: dump, json_line, json_array, log_line" default:"dump" `
 	SourceProxy         string `long:"source_proxy"            description:"set proxy to source http connections, ie: http://127.0.0.1:8080"`
 	TargetProxy         string `long:"dest_proxy"            description:"set proxy to target http connections, ie: http://127.0.0.1:8080"`
+	TargetHostHeader    string `long:"dest_host_header"        description:"set custom Host header for destination http connections, ie: my-es-cluster.example.com"`
 	Refresh             bool   `long:"refresh"                 description:"refresh after migration finished"`
 	Fields              string `long:"fields"                 description:"filter source fields, comma separated, ie: col1,col2,col3,..." `
 	RenameFields        string `long:"rename"                 description:"rename source fields, comma separated, ie: _type:type, name:myname" `

@@ -40,7 +40,7 @@ func BasicAuth(req *fasthttp.Request,user,pass string) {
 	req.Header.Add("Authorization", "Basic "+encoded)
 }
 
-func Get(url string,auth *Auth,proxy string) (*http.Response, string, []error) {
+func Get(url string,auth *Auth,proxy string,hostHeader string) (*http.Response, string, []error) {
 
 	request := gorequest.New()
 
@@ -62,7 +62,13 @@ func Get(url string,auth *Auth,proxy string) (*http.Response, string, []error) {
 		request.Proxy(proxy)
 	}
 
-	resp, body, errs := request.Get(url).End()
+	request.Get(url)
+
+	if(len(hostHeader)>0){
+		request.Set("Host", hostHeader)
+	}
+
+	resp, body, errs := request.End()
 	return resp, body, errs
 
 }
@@ -146,17 +152,17 @@ var fastHttpClient = &fasthttp.Client{
 	TLSConfig: &tls.Config{InsecureSkipVerify: true},
 }
 
-func DoRequest(compress bool,method string,loadUrl string,auth *Auth,body []byte,proxy string) (string,error)  {
+func DoRequest(compress bool,method string,loadUrl string,auth *Auth,body []byte,proxy string,hostHeader string) (string,error)  {
 
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
-	//defer fasthttp.ReleaseRequest(req)   // <- do not forget to release
-	//defer fasthttp.ReleaseResponse(resp) // <- do not forget to release
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
 
 	req.SetRequestURI(loadUrl)
 	req.Header.SetMethod(method)
 
-	//req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 
 	if compress {
 		req.Header.Set("Accept-Encoding", "gzip")
@@ -166,6 +172,12 @@ func DoRequest(compress bool,method string,loadUrl string,auth *Auth,body []byte
 	if auth!=nil{
 		req.URI().SetUsername(auth.User)
 		req.URI().SetPassword(auth.Pass)
+	}
+
+	// CRITICAL: Set Host header AFTER SetRequestURI to override the default
+	if len(hostHeader)>0{
+		req.Header.SetHostBytes([]byte(hostHeader))
+		log.Info("Set Host header to:", hostHeader, " for URL:", loadUrl)
 	}
 
 	if len(body)>0{
@@ -213,7 +225,10 @@ func DoRequest(compress bool,method string,loadUrl string,auth *Auth,body []byte
 	if resp.StatusCode() == http.StatusOK || resp.StatusCode() == http.StatusCreated {
 
 	} else {
-		//log.Error("received status code", resp.StatusCode, "from", string(resp.Header.Header()), "content", string(resp.Body()), req)
+		log.Error("received non-OK status code:", resp.StatusCode())
+		log.Error("response headers:", string(resp.Header.Header()))
+		log.Error("response body:", util.SubString(string(resp.Body()),0,2000))
+		log.Error("request URL:", loadUrl)
 	}
 
 

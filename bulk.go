@@ -61,17 +61,28 @@ READ_DOCS:
 				}
 			}
 
-			// sanity check
-			for _, key := range []string{"_index", "_type", "_source", "_id"} {
+			// sanity check (ES 8.x does not require _type)
+			skipDoc := false
+			for _, key := range []string{"_index", "_source", "_id"} {
 				if _, ok := docI[key]; !ok {
-					break READ_DOCS
+					log.Error("Document missing required field: ", key, " - skipping document")
+					skipDoc = true
+					break
 				}
+			}
+			if skipDoc {
+				continue
 			}
 
 			var tempDestIndexName string
 			var tempTargetTypeName string
 			tempDestIndexName = docI["_index"].(string)
-			tempTargetTypeName = docI["_type"].(string)
+			// ES 8.x does not have _type, default to _doc
+			if typeVal, ok := docI["_type"]; ok {
+				tempTargetTypeName = typeVal.(string)
+			} else {
+				tempTargetTypeName = "_doc" // ES 7+/8+ default
+			}
 
 			if c.Config.TargetIndexName != "" {
 				tempDestIndexName = c.Config.TargetIndexName
@@ -128,8 +139,16 @@ READ_DOCS:
 			}
 
 			// encode the doc and and the _source field for a bulk request
-			post := map[string]Document{
-				"index": doc,
+			// For ES 8.x, omit _type from bulk metadata
+			metadata := map[string]interface{}{
+				"_index": doc.Index,
+				"_id":    doc.Id,
+			}
+			if doc.Routing != "" {
+				metadata["routing"] = doc.Routing
+			}
+			post := map[string]interface{}{
+				"index": metadata,
 			}
 			if err = docEnc.Encode(post); err != nil {
 				log.Error(err)

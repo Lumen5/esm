@@ -113,11 +113,19 @@ func main() {
 				}
 
 				//get source es version
-				srcESVersion, errs := migrator.ClusterVersion(c.SourceEs, migrator.SourceAuth, migrator.Config.SourceProxy)
+				srcESVersion, errs := migrator.ClusterVersion(c.SourceEs, migrator.SourceAuth, migrator.Config.SourceProxy, "")
 				if errs != nil {
 					return
 				}
-				if strings.HasPrefix(srcESVersion.Version.Number, "7.") {
+				if strings.HasPrefix(srcESVersion.Version.Number, "8.") {
+					log.Debug("source es is V8,", srcESVersion.Version.Number)
+					api := new(ESAPIV7)
+					api.Host = c.SourceEs
+					api.Compress=c.Compress
+					api.Auth = migrator.SourceAuth
+					api.HttpProxy = migrator.Config.SourceProxy
+					migrator.SourceESAPI = api
+				} else if strings.HasPrefix(srcESVersion.Version.Number, "7.") {
 					log.Debug("source es is V7,", srcESVersion.Version.Number)
 					api := new(ESAPIV7)
 					api.Host = c.SourceEs
@@ -256,17 +264,26 @@ func main() {
 				}
 
 				//get target es version
-				descESVersion, errs := migrator.ClusterVersion(c.TargetEs, migrator.TargetAuth, migrator.Config.TargetProxy)
+				descESVersion, errs := migrator.ClusterVersion(c.TargetEs, migrator.TargetAuth, migrator.Config.TargetProxy, migrator.Config.TargetHostHeader)
 				if errs != nil {
 					return
 				}
 
-				if strings.HasPrefix(descESVersion.Version.Number, "7.") {
+				if strings.HasPrefix(descESVersion.Version.Number, "8.") {
+					log.Debug("target es is V8,", descESVersion.Version.Number)
+					api := new(ESAPIV7)
+					api.Host = c.TargetEs
+					api.Auth = migrator.TargetAuth
+					api.HttpProxy = migrator.Config.TargetProxy
+					api.HostHeader = migrator.Config.TargetHostHeader
+					migrator.TargetESAPI = api
+				} else if strings.HasPrefix(descESVersion.Version.Number, "7.") {
 					log.Debug("target es is V7,", descESVersion.Version.Number)
 					api := new(ESAPIV7)
 					api.Host = c.TargetEs
 					api.Auth = migrator.TargetAuth
 					api.HttpProxy = migrator.Config.TargetProxy
+					api.HostHeader = migrator.Config.TargetHostHeader
 					migrator.TargetESAPI = api
 				} else if strings.HasPrefix(descESVersion.Version.Number, "6.") {
 					log.Debug("target es is V6,", descESVersion.Version.Number)
@@ -274,6 +291,7 @@ func main() {
 					api.Host = c.TargetEs
 					api.Auth = migrator.TargetAuth
 					api.HttpProxy = migrator.Config.TargetProxy
+					api.HostHeader = migrator.Config.TargetHostHeader
 					migrator.TargetESAPI = api
 				} else if strings.HasPrefix(descESVersion.Version.Number, "5.") {
 					log.Debug("target es is V5,", descESVersion.Version.Number)
@@ -281,6 +299,7 @@ func main() {
 					api.Host = c.TargetEs
 					api.Auth = migrator.TargetAuth
 					api.HttpProxy = migrator.Config.TargetProxy
+					api.HostHeader = migrator.Config.TargetHostHeader
 					migrator.TargetESAPI = api
 				} else {
 					log.Debug("target es is not V5,", descESVersion.Version.Number)
@@ -288,6 +307,7 @@ func main() {
 					api.Host = c.TargetEs
 					api.Auth = migrator.TargetAuth
 					api.HttpProxy = migrator.Config.TargetProxy
+					api.HostHeader = migrator.Config.TargetHostHeader
 					migrator.TargetESAPI = api
 
 				}
@@ -521,10 +541,11 @@ func (c *Migrator) recoveryIndexSettings(sourceIndexRefreshSettings map[string]i
 	}
 }
 
-func (c *Migrator) ClusterVersion(host string, auth *Auth, proxy string) (*ClusterVersion, []error) {
+func (c *Migrator) ClusterVersion(host string, auth *Auth, proxy string, hostHeader string) (*ClusterVersion, []error) {
 
 	url := fmt.Sprintf("%s", host)
-	resp, body, errs := Get(url, auth, proxy)
+	log.Info("fetching cluster version from: ", url)
+	resp, body, errs := Get(url, auth, proxy, hostHeader)
 
 	if resp != nil && resp.Body != nil {
 		io.Copy(ioutil.Discard, resp.Body)
@@ -536,14 +557,19 @@ func (c *Migrator) ClusterVersion(host string, auth *Auth, proxy string) (*Clust
 		return nil, errs
 	}
 
-	log.Debug(body)
+	if len(body) > 0 {
+		log.Debug("response body: ", body)
+	} else {
+		log.Error("received empty response body from elasticsearch")
+	}
 
 	version := &ClusterVersion{}
 	err := json.Unmarshal([]byte(body), version)
 
 	if err != nil {
-		log.Error(body, errs)
-		return nil, errs
+		log.Error("failed to parse elasticsearch version response: ", err)
+		log.Error("response body was: ", body)
+		return nil, []error{err}
 	}
 	return version, nil
 }

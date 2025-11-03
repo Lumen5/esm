@@ -101,7 +101,7 @@ func (s *ESAPIV5) NewScroll(indexNames string,scrollTime string,docBufferCount i
                 }
         }
 
-        body, err := DoRequest(s.Compress,"POST",url, s.Auth,jsonBody,s.HttpProxy)
+        body, err := DoRequest(s.Compress,"POST",url, s.Auth,jsonBody,s.HttpProxy,s.HostHeader)
         if err != nil {
                 log.Error(err)
                 return nil, err
@@ -122,7 +122,7 @@ func (s *ESAPIV5) NextScroll(scrollTime string,scrollId string)(interface{},erro
 
         url:=fmt.Sprintf("%s/_search/scroll?scroll=%s&scroll_id=%s", s.Host, scrollTime, id)
 
-        body,err:=DoRequest(s.Compress,"GET",url,s.Auth,nil,s.HttpProxy)
+        body,err:=DoRequest(s.Compress,"GET",url,s.Auth,nil,s.HttpProxy,s.HostHeader)
 
         // decode elasticsearch scroll response
         scroll := &Scroll{}

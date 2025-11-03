@@ -68,7 +68,7 @@ func (s *ESAPIV6) NewScroll(indexNames string, scrollTime string, docBufferCount
 		}
 	}
 
-	body, err := DoRequest(s.Compress,"POST",url, s.Auth,jsonBody,s.HttpProxy)
+	body, err := DoRequest(s.Compress,"POST",url, s.Auth,jsonBody,s.HttpProxy,s.HostHeader)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -88,7 +88,7 @@ func (s *ESAPIV6) NextScroll(scrollTime string, scrollId string) (interface{}, e
 	id := bytes.NewBufferString(scrollId)
 
 	url := fmt.Sprintf("%s/_search/scroll?scroll=%s&scroll_id=%s", s.Host, scrollTime, id)
-	body,err:=DoRequest(s.Compress,"GET",url,s.Auth,nil,s.HttpProxy)
+	body,err:=DoRequest(s.Compress,"GET",url,s.Auth,nil,s.HttpProxy,s.HostHeader)
 
 	// decode elasticsearch scroll response
 	scroll := &Scroll{}
@@ -113,7 +113,7 @@ func (s *ESAPIV6) UpdateIndexSettings(indexName string,settings map[string]inter
 
 func (s *ESAPIV6) GetIndexMappings(copyAllIndexes bool, indexNames string) (string, int, *Indexes, error) {
 	url := fmt.Sprintf("%s/%s/_mapping", s.Host, indexNames)
-	resp, body, errs := Get(url, s.Auth,s.HttpProxy)
+	resp, body, errs := Get(url, s.Auth,s.HttpProxy,s.HostHeader)
 
 	if resp!=nil&& resp.Body!=nil{
 		io.Copy(ioutil.Discard, resp.Body)

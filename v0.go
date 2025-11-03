@@ -29,17 +29,18 @@ import (
 )
 
 type ESAPIV0 struct {
-        Host      string //eg: http://localhost:9200
-        Auth      *Auth  //eg: user:pass
-        HttpProxy string //eg: http://proxyIp:proxyPort
-        Compress bool
+        Host       string //eg: http://localhost:9200
+        Auth       *Auth  //eg: user:pass
+        HttpProxy  string //eg: http://proxyIp:proxyPort
+        HostHeader string //eg: my-cluster.example.com
+        Compress   bool
 }
 
 
 func (s *ESAPIV0) ClusterHealth() *ClusterHealth {
 
         url := fmt.Sprintf("%s/_cluster/health", s.Host)
-        r, body, errs := Get(url, s.Auth,s.HttpProxy)
+        r, body, errs := Get(url, s.Auth,s.HttpProxy,s.HostHeader)
 
         if r!=nil&& r.Body!=nil{
                 io.Copy(ioutil.Discard, r.Body)
@@ -71,7 +72,8 @@ func (s *ESAPIV0) Bulk(data *bytes.Buffer) {
         data.WriteRune('\n')
         url := fmt.Sprintf("%s/_bulk", s.Host)
 
-        body,err:=DoRequest(s.Compress,"POST",url,s.Auth,data.Bytes(),s.HttpProxy)
+        log.Info("Bulk request - Host: ", s.Host, " HostHeader: ", s.HostHeader, " HttpProxy: ", s.HttpProxy)
+        body,err:=DoRequest(s.Compress,"POST",url,s.Auth,data.Bytes(),s.HttpProxy,s.HostHeader)
 
         if err != nil {
                 log.Error(err)
@@ -81,8 +83,13 @@ func (s *ESAPIV0) Bulk(data *bytes.Buffer) {
         err=DecodeJson(body, &response)
         if err == nil {
                 if response.Errors{
-                        fmt.Println(body)
+                        log.Error("CRITICAL: bulk request had errors - some documents may not have been indexed!")
+                        log.Error("Bulk error response:", body)
                 }
+        } else {
+                log.Error("CRITICAL: failed to decode bulk response - data may be lost!")
+                log.Error("Error:", err)
+                log.Error("Response body:", body)
         }
 
         data.Reset()
@@ -94,7 +101,7 @@ func (s *ESAPIV0) GetIndexSettings(indexNames string) (*Indexes, error) {
         allSettings := &Indexes{}
 
         url := fmt.Sprintf("%s/%s/_settings", s.Host, indexNames)
-        resp, body, errs := Get(url, s.Auth,s.HttpProxy)
+        resp, body, errs := Get(url, s.Auth,s.HttpProxy,s.HostHeader)
 
         if resp!=nil&& resp.Body!=nil{
                 io.Copy(ioutil.Discard, resp.Body)
@@ -122,7 +129,7 @@ func (s *ESAPIV0) GetIndexSettings(indexNames string) (*Indexes, error) {
 
 func (s *ESAPIV0) GetIndexMappings(copyAllIndexes bool, indexNames string) (string, int, *Indexes, error) {
         url := fmt.Sprintf("%s/%s/_mapping", s.Host, indexNames)
-        resp, body, errs := Get(url, s.Auth,s.HttpProxy)
+        resp, body, errs := Get(url, s.Auth,s.HttpProxy,s.HostHeader)
 
         if resp!=nil&& resp.Body!=nil{
                 io.Copy(ioutil.Discard, resp.Body)
@@ -351,7 +358,7 @@ func (s *ESAPIV0) NewScroll(indexNames string, scrollTime string, docBufferCount
 
         }
         //resp, body, errs := Post(url, s.Auth,jsonBody,s.HttpProxy)
-        body, err := DoRequest(s.Compress,"POST",url, s.Auth,jsonBody,s.HttpProxy)
+        body, err := DoRequest(s.Compress,"POST",url, s.Auth,jsonBody,s.HttpProxy,s.HostHeader)
         if err != nil {
                 log.Error(err)
                 return nil, err
@@ -371,7 +378,7 @@ func (s *ESAPIV0) NextScroll(scrollTime string, scrollId string) (interface{}, e
         //  curl -XGET 'http://es-0.9:9200/_search/scroll?scroll=5m'
         id := bytes.NewBufferString(scrollId)
         url := fmt.Sprintf("%s/_search/scroll?scroll=%s&scroll_id=%s", s.Host, scrollTime, id)
-        body,err:=DoRequest(s.Compress,"GET",url,s.Auth,nil,s.HttpProxy)
+        body,err:=DoRequest(s.Compress,"GET",url,s.Auth,nil,s.HttpProxy,s.HostHeader)
 
         if err != nil {
                 log.Error(err)
