@@ -52,6 +52,13 @@ READ_DOCS:
 		select {
 		case docI, open := <-c.DocChan:
 			var err error
+
+			// if channel is closed, flush and exit
+			if !open {
+				log.Debug("DocChan closed, finishing bulk worker")
+				goto WORKER_DONE
+			}
+
 			log.Trace("read doc from channel,", docI)
 			// this check is in case the document is an error with scroll stuff
 			if status, ok := docI["status"]; ok {
@@ -62,16 +69,14 @@ READ_DOCS:
 			}
 
 			// sanity check (ES 8.x does not require _type)
-			skipDoc := false
+			// If a document is missing _index, _source, or _id, the scroll is corrupted
 			for _, key := range []string{"_index", "_source", "_id"} {
 				if _, ok := docI[key]; !ok {
-					log.Error("Document missing required field: ", key, " - skipping document")
-					skipDoc = true
-					break
+					log.Error("FATAL: Document missing required field: ", key)
+					log.Error("This indicates the scroll response is corrupted or malformed")
+					log.Error("Document received:", docI)
+					panic("Scroll returned malformed document - aborting to prevent data loss")
 				}
-			}
-			if skipDoc {
-				continue
 			}
 
 			var tempDestIndexName string
@@ -125,11 +130,6 @@ READ_DOCS:
 				if ok && str != "" {
 					doc.Routing = str
 				}
-			}
-
-			// if channel is closed flush and gtfo
-			if !open {
-				goto WORKER_DONE
 			}
 
 			// sanity check
